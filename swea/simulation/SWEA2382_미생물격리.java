@@ -4,51 +4,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
 
-// 군집이 가지는 속성 : 위치(x, y), 미생물수(c), 방향(d), 임시 미생물 수 (tmp) -> Team 클래스 + List
-// 가장자리 부분 약품 처리 : 0행 0열, N-1행 N-1열
-// 한시간 마다 군집의 이동 : 상하좌우. 한칸씩 군집이 갖는 방향으로.
-//		이동한 곳이 가장자리면 군집/2 처리 + 다른 군집과 충돌하면 큰 군집으로 수 병합
-
-// 다른 군집과 충돌하는 것 처리 -> 미생물 수가 큰 군집의 임시 미생물 수 변수에,
-// 		미생물 수가 작은 군집의 미생물 수 + 임시 미생물 수를 누적해 준 뒤 큰 군집을 배열에 넣어둔다.
-//		마지막에 임시 미생물 수 값을 가지고 있는 군집이 있으면 원래의 미생물 수에 누적한다.
-
-/*
-1
-7 2 9
-1 1 7 1
-2 1 7 1
-5 1 5 4
-3 2 8 4
-4 3 14 1
-3 4 7 3
-1 5 8 2
-3 5 100 1
-5 5 1 1
-=> 149
-*/
-
 public class SWEA2382_미생물격리 {
 
-	static int T, N, K, M, res;
-	static Team[][] map;
-	static List<Team> list;
+	static int T, N, M, K;
+	static Crew[][] map;
+	static List<Crew> list;
 	
-	static int[] dx = {-1, 1, 0, 0}; // 상하좌우
+	static int[] dx = {-1, 1, 0, 0};
 	static int[] dy = {0, 0, -1, 1};
 	
-	static class Team {
-		int x, y, c, d, tmp;
-		Team(int x, int y, int c, int d) {
+	static class Crew {
+		int x, y, cnt, dir, tmp;
+		Crew (int x, int y, int cnt, int dir) {
 			this.x = x;
 			this.y = y;
-			this.c = c;
-			this.d = d;
-		}
-		
-		@Override
-		public String toString() {
-			return "Team [x=" + x + ", y=" + y + ", c=" + c + ", d=" + d + "]";
+			this.cnt = cnt;
+			this.dir = dir;
 		}
 	}
 	
@@ -60,102 +31,101 @@ public class SWEA2382_미생물격리 {
 		
 		for (int t = 1; t <= T; t++) {
 			st = new StringTokenizer(br.readLine());
-			N = Integer.parseInt(st.nextToken());
-			M = Integer.parseInt(st.nextToken());
-			K = Integer.parseInt(st.nextToken());
+			N = Integer.parseInt(st.nextToken());  // 행, 열
+			M = Integer.parseInt(st.nextToken());  // 격리시간
+			K = Integer.parseInt(st.nextToken());  // 미생물 군집 수
 			
-			map = new Team[N][N];
 			list = new ArrayList<>();
+			
 			for (int i = 0; i < K; i++) {
 				st = new StringTokenizer(br.readLine());
 				int x = Integer.parseInt(st.nextToken());
 				int y = Integer.parseInt(st.nextToken());
-				int c = Integer.parseInt(st.nextToken());
-				int d = Integer.parseInt(st.nextToken()) - 1;
+				int cnt = Integer.parseInt(st.nextToken());
+				int dir = Integer.parseInt(st.nextToken()) - 1;
 				
-				Team team = new Team(x, y, c, d);
-				map[x][y] = team;
-				list.add(team);
+				list.add(new Crew(x, y, cnt, dir));
+			} // 입력 끝
+			
+			while(M-- > 0) {
+				// #1. 군집 이동
+				move();
+				
+				// #2. 중복 제거
+				check();
 			}
 			
-			res = 0;
-			
-			move();
-			
-			int size = list.size();
-			for (int i = 0; i < size; i++) {
-				res += list.get(i).c;
-			}
-			
-			System.out.println("#" + t + " " + res);
+			System.out.println("#" + t + " " + count());
 		}
 	}
 
 	static void move() {
+		int size = list.size();
 		
-		while(M-- > 0) {
-			int size = list.size();
-			for (int i = size-1; i >= 0; i--) {
-				Team t = list.get(i);
+		for (int i = size-1; i >= 0; i--) {
+			Crew c = list.get(i);
+			c.x += dx[c.dir];
+			c.y += dy[c.dir];
+			
+			// 약품 위치로 이동했을 경우
+			if(c.x == 0 || c.y == 0 || c.x == N-1 || c.y == N-1) {
+				// 미생물 수 절반 감소
+				c.cnt /= 2;
 				
-				t.x += dx[t.d];
-				t.y += dy[t.d];
-				
-				// 가장자리 약품에 닿으면 미생물 수 절반 줄어듬
-				if(t.x == 0 || t.y == 0 || t.x == N-1 || t.y == N-1) {
-					t.c /= 2;
-					
-					if(t.c == 0) { // 미생물수가 없으면 군집 제거 
-						list.remove(i);
-						continue;
-					}
-					
-					switch(t.d) { // 방향 반대로 전환
-					case 0 : t.d = 1; break;
-					case 1 : t.d = 0; break;
-					case 2 : t.d = 3; break;
-					case 3 : t.d = 2; break;
-					}
+				// 방향 반대로 전환
+				switch(c.dir) {
+				case 0: c.dir = 1; break;
+				case 1: c.dir = 0; break;
+				case 2: c.dir = 3; break;
+				case 3: c.dir = 2; break;
 				}
 			}
 			
-			clean(); // 겹쳐진 군집 정리
+			// 미생물 수가 0이면 군집 제거
+			if(c.cnt == 0)
+				list.remove(i);
 		}
 	}
 	
-	static void clean() {
-		// 초기화
-		for (int i = 0; i < N; i++) {
-			for (int j = 0; j < N; j++) {
-				map[i][j] = null;
-			}
-		}
+	static void check() {
+		map = new Crew[N][N];
 		
-		// 리스트의 군집 정보를 배열에 업데이트
 		int size = list.size();
 		for (int i = size-1; i >= 0; i--) {
-			Team t = list.get(i);
+			Crew c = list.get(i);
 			
-			if(map[t.x][t.y] == null) { // 칸이 비어있으면 바로 저장
-				map[t.x][t.y] = t;
-			} else { // 칸이 비어있지 않으면 미생물 수 비교 후 큰쪽의 임시 미생물 수에 값 누적
-				if(map[t.x][t.y].c < t.c) {
-					t.tmp += map[t.x][t.y].c + map[t.x][t.y].tmp;
-					list.remove(map[t.x][t.y]);
-					map[t.x][t.y] = t;
+			if(map[c.x][c.y] == null) { // 이동한 위치에 군집이 없으면 바로 등록
+				map[c.x][c.y] = c;
+			} else {  // 이동한 위치에 군집 있으면 군집수 비교
+				if(map[c.x][c.y].cnt < c.cnt) {
+					c.tmp += map[c.x][c.y].cnt + map[c.x][c.y].tmp;
+					list.remove(map[c.x][c.y]);
+					map[c.x][c.y] = c;
 				} else {
-					map[t.x][t.y].tmp += t.c;
-					list.remove(i);
+					map[c.x][c.y].tmp += c.cnt + c.tmp;
+					list.remove(c);
 				}
 			}
 		}
 		
+		// 병합된 군집의 미생물 수 누적
 		size = list.size();
 		for (int i = 0; i < size; i++) {
-			if(list.get(i).tmp != 0) {
-				list.get(i).c += list.get(i).tmp;
-				list.get(i).tmp = 0;
-			}
+			Crew c = list.get(i);
+			c.cnt += c.tmp;
+			c.tmp = 0;
 		}
 	}
+	
+	static int count() {
+		int cnt = 0;
+		
+		int size = list.size();
+		for (int i = 0; i < size; i++) {
+			cnt += list.get(i).cnt;
+		}
+		
+		return cnt;
+	}
+	
 }
